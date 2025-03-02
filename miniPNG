@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>이미지 사이즈 최적화</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'media',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="min-h-screen bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-200">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-primary mb-2">이미지 사이즈 최적화</h1>
+            <p class="text-gray-600 dark:text-gray-400">이미지를 업로드하고 품질 손실 없이 파일 크기를 줄여보세요</p>
+        </header>
+
+        <main>
+            <!-- 업로드 섹션 -->
+            <div id="uploadSection" class="mb-8">
+                <div id="dropArea" class="border-2 border-dashed border-primary rounded-lg p-8 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200">
+                    <div class="flex flex-col items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-primary mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <p class="mb-2 text-lg font-medium">이미지를 여기에 끌어다 놓으세요</p>
+                        <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">또는 클릭하여 파일 선택</p>
+                        <label class="bg-primary hover:bg-opacity-90 text-white font-medium py-2 px-4 rounded-lg cursor-pointer transition-colors duration-200">
+                            파일 선택
+                            <input type="file" id="fileInput" class="hidden" accept="image/*" multiple>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 처리 상태 -->
+            <div id="processingStatus" class="hidden mb-8">
+                <div class="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4 flex items-center">
+                    <svg class="animate-spin h-5 w-5 text-primary mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>이미지 처리 중...</span>
+                </div>
+            </div>
+
+            <!-- 결과 섹션 -->
+            <div id="resultsSection" class="hidden">
+                <h2 class="text-xl font-bold mb-4">최적화된 이미지</h2>
+                <div id="resultContainer" class="space-y-6"></div>
+            </div>
+
+            <!-- 안내 섹션 -->
+            <div class="mt-8 bg-gray-50 dark:bg-gray-800 rounded-lg p-6">
+                <h2 class="text-xl font-bold mb-2">사용 방법</h2>
+                <ol class="list-decimal list-inside space-y-2 text-gray-700 dark:text-gray-300">
+                    <li>이미지를 드래그 앤 드롭하거나 클릭하여 파일 선택</li>
+                    <li>최적화 과정이 완료될 때까지 기다리기</li>
+                    <li>압축 전/후 결과 확인하기</li>
+                    <li>다운로드 버튼을 클릭하거나 최적화된 이미지에서 마우스 오른쪽 버튼 클릭 후 "이미지를 다른 이름으로 저장..." 선택하여 다운로드</li>
+                </ol>
+                <div class="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                    <p>참고: 모든 처리는 브라우저에서 이루어집니다. 이미지는 어떤 서버에도 업로드되지 않습니다.</p>
+                </div>
+            </div>
+        </main>
+
+        <footer class="mt-12 text-center text-sm text-gray-500 dark:text-gray-400">
+            <p>Poe를 위해 만들어졌습니다 ❤️</p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const dropArea = document.getElementById('dropArea');
+            const fileInput = document.getElementById('fileInput');
+            const processingStatus = document.getElementById('processingStatus');
+            const resultsSection = document.getElementById('resultsSection');
+            const resultContainer = document.getElementById('resultContainer');
+            
+            // 드래그 앤 드롭 이벤트 처리
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, highlight, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, unhighlight, false);
+            });
+            
+            function highlight() {
+                dropArea.classList.add('border-primary', 'bg-gray-50', 'dark:bg-gray-800');
+            }
+            
+            function unhighlight() {
+                dropArea.classList.remove('border-primary', 'bg-gray-50', 'dark:bg-gray-800');
+            }
+            
+            // 파일 드롭 처리
+            dropArea.addEventListener('drop', handleDrop, false);
+            
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFiles(files);
+            }
+            
+            // 파일 선택 처리
+            fileInput.addEventListener('change', function() {
+                handleFiles(this.files);
+            });
+            
+            // 클릭 이벤트 처리
+            dropArea.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            function handleFiles(files) {
+                if (files.length === 0) return;
+                
+                // 처리 상태 표시
+                processingStatus.classList.remove('hidden');
+                resultsSection.classList.remove('hidden');
+                resultContainer.innerHTML = ''; // 이전 결과 지우기
+                
+                const imageFiles = Array.from(files).filter(file => {
+                    // 더 많은 이미지 형식 지원
+                    return file.type.startsWith('image/') || 
+                           file.name.toLowerCase().endsWith('.webp') || 
+                           file.name.toLowerCase().endsWith('.avif') || 
+                           file.name.toLowerCase().endsWith('.gif');
+                });
+                
+                let processedCount = 0;
+                
+                imageFiles.forEach(file => {
+                    processImage(file).then(result => {
+                        displayResult(file, result);
+                        processedCount++;
+                        
+                        if (processedCount === imageFiles.length) {
+                            processingStatus.classList.add('hidden');
+                        }
+                    }).catch(error => {
+                        console.error('이미지 처리 오류:', error);
+                        processedCount++;
+                        
+                        if (processedCount === imageFiles.length) {
+                            processingStatus.classList.add('hidden');
+                        }
+                    });
+                });
+            }
+            
+            async function processImage(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(event) {
+                        const img = new Image();
+                        
+                        img.onload = function() {
+                            try {
+                                // 원본 크기 가져오기
+                                const origWidth = img.width;
+                                const origHeight = img.height;
+                                
+                                // 새로운 크기 계산 (최대 1600px 너비/높이)
+                                let newWidth = origWidth;
+                                let newHeight = origHeight;
+                                
+                                const maxDimension = 1600;
+                                
+                                if (origWidth > maxDimension || origHeight > maxDimension) {
+                                    if (origWidth > origHeight) {
+                                        newWidth = maxDimension;
+                                        newHeight = Math.round(origHeight * (maxDimension / origWidth));
+                                    } else {
+                                        newHeight = maxDimension;
+                                        newWidth = Math.round(origWidth * (maxDimension / origHeight));
+                                    }
+                                }
+                                
+                                // 캔버스 생성 및 이미지 리사이징
+                                const canvas = document.createElement('canvas');
+                                canvas.width = newWidth;
+                                canvas.height = newHeight;
+                                
+                                const ctx = canvas.getContext('2d');
+                                // 더 나은 이미지 품질 알고리즘 사용
+                                ctx.imageSmoothingEnabled = true;
+                                ctx.imageSmoothingQuality = 'high';
+                                ctx.drawImage(img, 0, 0, newWidth, newHeight);
+                                
+                                // 최적의 형식 및 압축 결정
+                                let outputType = file.type || 'image/jpeg';
+                                let quality = 0.8; // 기본 품질
+                                
+                                // PNG 파일의 경우 JPEG가 더 나을지 확인
+                                if (file.type === 'image/png') {
+                                    // 이미지에 투명도가 없는 경우만 JPEG로 변환
+                                    const imageData = ctx.getImageData(0, 0, newWidth, newHeight).data;
+                                    let hasTransparency = false;
+                                    
+                                    // 투명 픽셀 확인
+                                    for (let i = 3; i < imageData.length; i += 4) {
+                                        if (imageData[i] < 255) {
+                                            hasTransparency = true;
+                                            break;
+                                        }
+                                    }
+                                    
+                                    if (!hasTransparency) {
+                                        // 투명도가 없으면 JPEG가 대개 더 작음
+                                        outputType = 'image/jpeg';
+                                        quality = 0.85;
+                                    } else {
+                                        // 투명 PNG의 경우 PNG 사용
+                                        outputType = 'image/png';
+                                    }
+                                } else if (file.type === 'image/jpeg') {
+                                    outputType = 'image/jpeg';
+                                    quality = 0.85;
+                                } else if (file.type === 'image/webp' || file.name.toLowerCase().endsWith('.webp')) {
+                                    // WebP 처리
+                                    outputType = 'image/webp';
+                                    quality = 0.80;
+                                } else if (file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif')) {
+                                    // GIF는 PNG로 변환 (애니메이션은 유지되지 않음)
+                                    outputType = 'image/png';
+                                } else if (file.type === 'image/avif' || file.name.toLowerCase().endsWith('.avif')) {
+                                    // AVIF는 브라우저 지원이 제한적이므로 WebP나 JPEG로 변환
+                                    outputType = 'image/webp';
+                                    quality = 0.80;
+                                }
+                                
+                                // 압축된 이미지 데이터 가져오기
+                                const optimizedDataUrl = canvas.toDataURL(outputType, quality);
+                                
+                                // 크기 감소 계산
+                                const originalSize = file.size;
+                                const optimizedSize = Math.round((optimizedDataUrl.length * 3) / 4) - optimizedDataUrl.indexOf(',') - 1;
+                                
+                                resolve({
+                                    originalUrl: event.target.result,
+                                    optimizedUrl: optimizedDataUrl,
+                                    originalSize: originalSize,
+                                    optimizedSize: optimizedSize,
+                                    width: newWidth,
+                                    height: newHeight,
+                                    originalWidth: origWidth,
+                                    originalHeight: origHeight,
+                                    outputType: outputType
+                                });
+                            } catch (error) {
+                                reject(error);
+                            }
+                        };
+                        
+                        img.onerror = function() {
+                            reject(new Error('이미지 로드 오류'));
+                        };
+                        
+                        img.src = event.target.result;
+                    };
+                    
+                    reader.onerror = function() {
+                        reject(new Error('파일 읽기 오류'));
+                    };
+                    
+                    reader.readAsDataURL(file);
+                });
+            }
+            
+            function displayResult(file, result) {
+                const savingsPercent = Math.round((1 - (result.optimizedSize / result.originalSize)) * 100);
+                const sizeDifference = formatSize(result.originalSize - result.optimizedSize);
+                
+                const resultItem = document.createElement('div');
+                resultItem.className = 'bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden';
+                
+                // 최적화된 크기를 읽기 쉬운 형식으로 변환
+                const originalSizeStr = formatSize(result.originalSize);
+                const optimizedSizeStr = formatSize(result.optimizedSize);
+                
+                // 파일 확장자에서 파일 이름 추출
+                const fileName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+                
+                resultItem.innerHTML = `
+                    <div class="p-4">
+                        <div class="font-medium text-gray-900 dark:text-white mb-2">${file.name}</div>
+                        <div class="flex flex-wrap justify-between mb-4 gap-2">
+                            <div class="text-sm">
+                                <span class="text-gray-500 dark:text-gray-400">원본:</span> 
+                                <span>${originalSizeStr}</span>
+                            </div>
+                            <div class="text-sm">
+                                <span class="text-gray-500 dark:text-gray-400">최적화:</span> 
+                                <span>${optimizedSizeStr}</span>
+                            </div>
+                            <div class="text-sm ${savingsPercent > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}">
+                                <span>절약:</span> 
+                                <span>${savingsPercent}% (${sizeDifference})</span>
+                            </div>
+                        </div>
+                        <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                            <div class="flex-1">
+                                <div class="text-xs text-center mb-1 text-gray-500 dark:text-gray-400">원본 (${result.originalWidth}×${result.originalHeight})</div>
+                                <div class="relative bg-gray-100 dark:bg-gray-700 rounded overflow-hidden">
+                                    <img src="${result.originalUrl}" alt="원본" class="w-full object-contain max-h-[300px]">
+                                </div>
+                            </div>
+                            <div class="flex-1">
+                                <div class="text-xs text-center mb-1 text-gray-500 dark:text-gray-400">최적화 (${result.width}×${result.height})</div>
+                                <div class="relative bg-gray-100 dark:bg-gray-700 rounded overflow-hidden">
+                                    <img src="${result.optimizedUrl}" alt="최적화" class="w-full object-contain max-h-[300px]" data-optimized-image>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex flex-wrap justify-center gap-2">
+                            <button class="bg-primary hover:bg-opacity-90 text-white px-4 py-2 rounded shadow-sm text-sm font-medium transition-colors download-png-btn" 
+                                    data-filename="${fileName}-optimized.png">
+                                PNG로 다운로드
+                            </button>
+                            <button class="bg-primary hover:bg-opacity-90 text-white px-4 py-2 rounded shadow-sm text-sm font-medium transition-colors download-original-format-btn"
+                                    data-filename="${fileName}-optimized${getExtensionFromMimeType(result.outputType)}">
+                                원본 형식으로 다운로드
+                            </button>
+                        </div>
+                    </div>
+                    <div class="px-4 py-3 bg-gray-50 dark:bg-gray-700 text-sm">
+                        <p class="text-gray-500 dark:text-gray-300">또는 이미지에서 마우스 오른쪽 버튼을 클릭하고 "이미지를 다른 이름으로 저장..."을 선택하여 다운로드하세요</p>
+                    </div>
+                `;
+                
+                resultContainer.appendChild(resultItem);
+                
+                // PNG 다운로드 버튼에 이벤트 리스너 추가
+                const downloadPngBtn = resultItem.querySelector('.download-png-btn');
+                downloadPngBtn.addEventListener('click', function() {
+                    const imageElement = resultItem.querySelector('[data-optimized-image]');
+                    const filename = this.getAttribute('data-filename');
+                    downloadAsPng(imageElement, filename);
+                });
+                
+                // 원본 형식 다운로드 버튼에 이벤트 리스너 추가
+                const downloadOriginalFormatBtn = resultItem.querySelector('.download-original-format-btn');
+                downloadOriginalFormatBtn.addEventListener('click', function() {
+                    const imageUrl = result.optimizedUrl;
+                    const filename = this.getAttribute('data-filename');
+                    downloadImage(imageUrl, filename);
+                });
+            }
+            
+            // 이미지를 PNG로 다운로드하는 함수
+            function downloadAsPng(imageElement, filename) {
+                try {
+                    // 캔버스 생성
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // 이미지 크기로 캔버스 설정
+                    canvas.width = imageElement.naturalWidth;
+                    canvas.height = imageElement.naturalHeight;
+                    
+                    // 캔버스에 이미지 그리기
+                    ctx.drawImage(imageElement, 0, 0);
+                    
+                    // PNG 형식으로 데이터 URL 생성
+                    const dataUrl = canvas.toDataURL('image/png');
+                    
+                    // 다운로드 링크 생성 및 클릭
+                    downloadImage(dataUrl, filename);
+                } catch (error) {
+                    console.error('PNG 다운로드 중 오류 발생:', error);
+                    alert('이미지를 PNG로 변환하는 중 오류가 발생했습니다.');
+                }
+            }
+            
+            // 이미지 URL을 다운로드하는 함수
+            function downloadImage(dataUrl, filename) {
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+            
+            // MIME 타입에서 파일 확장자 추출
+            function getExtensionFromMimeType(mimeType) {
+                const extensions = {
+                    'image/jpeg': '.jpg',
+                    'image/png': '.png',
+                    'image/webp': '.webp',
+                    'image/gif': '.gif',
+                    'image/avif': '.avif',
+                    'image/svg+xml': '.svg'
+                };
+                
+                return extensions[mimeType] || '.jpg';  // 기본값으로 .jpg 반환
+            }
+            
+            function formatSize(bytes) {
+                if (bytes < 1024) {
+                    return bytes + ' B';
+                } else if (bytes < 1024 * 1024) {
+                    return (bytes / 1024).toFixed(1) + ' KB';
+                } else {
+                    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
